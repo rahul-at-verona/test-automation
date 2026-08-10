@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!-- Logged-out onboarding suite. Filter a subset with -Dgroups=<Origin>,
+     e.g. -Dgroups=OtpScreenTests -->
+<suite name="Verona Onboarding" preserve-order="true">
+    <test name="Onboarding">
+        <classes>
+            <class name="club.verona.automation.tests.OnboardingPageTests"/>
+        </classes>
+    </test>
+</suite>

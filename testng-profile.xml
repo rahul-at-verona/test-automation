@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "https://testng.org/testng-1.0.dtd">
+<!-- Logged-in profile suite. Filter with -Dgroups=ProfilePageTests
+     or -Dgroups=ProfileFieldEditTests -->
+<suite name="Verona Profile" preserve-order="true">
+    <test name="Profile">
+        <classes>
+            <class name="club.verona.automation.tests.ProfileTests"/>
+        </classes>
+    </test>
+</suite>
