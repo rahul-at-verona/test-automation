@@ -5,23 +5,61 @@ import io.appium.java_client.android.AndroidDriver;
 import io.appium.java_client.android.options.UiAutomator2Options;
 import io.appium.java_client.ios.IOSDriver;
 import io.appium.java_client.ios.options.XCUITestOptions;
+import org.openqa.selenium.remote.http.ClientConfig;
+import org.openqa.selenium.remote.http.Filter;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
+import java.util.Properties;
 
 /**
  * Creates the AppiumDriver for the platform passed via -Dplatform=android|ios.
  * Usage: mvn test -Dplatform=android
+ *
+ * Targets a local Appium server by default. Set tnt.use.local.grid=true in
+ * verona.properties (or -Dtnt.use.local.grid=true) to run against the BestQ
+ * device farm instead, using the grid URL/credentials/device id from that
+ * file (see https://bestq.best-quality.in/ui/#verona/stf-devices).
  */
 public final class DriverFactory {
 
+    private static final Properties GRID = loadGridProperties();
+    private static final String DEVICE_ID_PREFIX = "DeviceId_";
+
     private DriverFactory() {}
+
+    public static boolean isRemoteGrid() {
+        return Boolean.parseBoolean(
+                System.getProperty("tnt.use.local.grid", GRID.getProperty("tnt.use.local.grid", "false")));
+    }
 
     public static AppiumDriver create() {
         String platform = System.getProperty("platform", "android").toLowerCase();
-        URL serverUrl = serverUrl();
 
+        // The BestQ grid's 401 responses omit WWW-Authenticate, so Selenium's
+        // reactive ClientConfig#authenticateAs (java.net.Authenticator) never
+        // fires and credentials embedded in the URL are dropped outright.
+        // Confirmed against the live grid: only a preemptive Authorization
+        // header on every request gets past its auth proxy.
+        if (isRemoteGrid()) {
+            ClientConfig config = ClientConfig.defaultConfig()
+                    .baseUrl(remoteGridUrl())
+                    .withFilter(basicAuthFilter(
+                            require("tnt.local.grid.user"), require("tnt.local.grid.password")));
+            return switch (platform) {
+                case "android" -> new AndroidDriver(config, androidOptions());
+                case "ios"     -> new IOSDriver(config, iosOptions());
+                default -> throw new IllegalArgumentException("Unknown platform: " + platform);
+            };
+        }
+
+        URL serverUrl = localServerUrl();
         return switch (platform) {
             case "android" -> new AndroidDriver(serverUrl, androidOptions());
             case "ios"     -> new IOSDriver(serverUrl, iosOptions());
@@ -33,7 +71,7 @@ public final class DriverFactory {
         UiAutomator2Options options = new UiAutomator2Options()
                 .setPlatformName("Android")
                 .setAutomationName("UiAutomator2")
-                .setUdid(System.getProperty("udid", "emulator-5554"))
+                .setUdid(resolveUdid())
                 .setAppPackage("club.verona")
                 .setAppActivity("club.verona.MainActivity")
                 .setNoReset(true)                       // keep logged-in state
@@ -80,6 +118,9 @@ public final class DriverFactory {
      * "socket hang up" / proxy-timeout failures on this app.
      */
     public static void cleanupInstrumentation() {
+        if (isRemoteGrid()) {
+            return; // no local adb access to a device sitting in the BestQ cloud
+        }
         String udid = System.getProperty("udid", "emulator-5554");
         String androidHome = System.getenv("ANDROID_HOME");
         String adb = (androidHome != null ? androidHome : System.getProperty("user.home")
@@ -101,6 +142,9 @@ public final class DriverFactory {
      * session (forceAppLaunch then cold-starts into the fresh state).
      */
     public static void clearAppStorage() {
+        if (isRemoteGrid()) {
+            return; // remote sessions are reset via the noReset/fullReset capability instead
+        }
         runAdb("shell", "pm", "clear", "club.verona");
     }
 
@@ -119,11 +163,82 @@ public final class DriverFactory {
         }
     }
 
-    private static URL serverUrl() {
+    private static URL localServerUrl() {
         try {
             return new URL(System.getProperty("appium.server", "http://127.0.0.1:4723"));
         } catch (MalformedURLException e) {
             throw new IllegalStateException("Bad Appium server URL", e);
+        }
+    }
+
+    private static Filter basicAuthFilter(String user, String password) {
+        String token = Base64.getEncoder().encodeToString(
+                (user + ":" + password).getBytes(StandardCharsets.UTF_8));
+        return next -> request -> {
+            request.setHeader("Authorization", "Basic " + token);
+            return next.execute(request);
+        };
+    }
+
+    private static URL remoteGridUrl() {
+        try {
+            return new URL(require("tnt.local.grid.ip"));
+        } catch (MalformedURLException e) {
+            throw new IllegalStateException("Bad BestQ grid URL (tnt.local.grid.ip)", e);
+        }
+    }
+
+    /**
+     * Resolves the target device udid: explicit -Dudid wins, then the BestQ
+     * device id from verona.properties (browser_caps.device, stripping its
+     * "DeviceId_" prefix), then the local emulator default.
+     */
+    private static String resolveUdid() {
+        String explicit = System.getProperty("udid");
+        if (explicit != null) {
+            return explicit;
+        }
+        if (isRemoteGrid()) {
+            String deviceId = require("browser_caps.device");
+            return deviceId.startsWith(DEVICE_ID_PREFIX) ? deviceId.substring(DEVICE_ID_PREFIX.length()) : deviceId;
+        }
+        return "emulator-5554";
+    }
+
+    /**
+     * -Dkey=value (e.g. injected from a CI secret) always wins over both
+     * property files, so credentials never have to be written to disk in CI.
+     */
+    private static String require(String key) {
+        String value = System.getProperty(key, GRID.getProperty(key));
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(
+                    "Missing required property '" + key + "' (checked -D" + key
+                            + ", verona.local.properties, verona.properties)");
+        }
+        return value;
+    }
+
+    /**
+     * Loads verona.properties (tracked, non-secret defaults), then layers
+     * verona.local.properties on top if present. The local file is
+     * git-ignored and holds real grid credentials — see
+     * verona.local.properties.example for the keys it should contain.
+     */
+    private static Properties loadGridProperties() {
+        Properties props = new Properties();
+        loadResourceInto(props, "verona.properties");
+        loadResourceInto(props, "verona.local.properties");
+        return props;
+    }
+
+    private static void loadResourceInto(Properties props, String resourceName) {
+        try (InputStream in = DriverFactory.class.getClassLoader().getResourceAsStream(resourceName)) {
+            if (in != null) {
+                props.load(in);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load " + resourceName, e);
         }
     }
 }

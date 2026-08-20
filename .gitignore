@@ -1,0 +1,6 @@
+target/
+.idea/
+.DS_Store
+
+# local secrets — real credentials live only on each dev's machine / CI secrets
+src/resources/verona.local.properties
