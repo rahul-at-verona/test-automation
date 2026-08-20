@@ -78,6 +78,8 @@ public final class DriverFactory {
                 .setAutoGrantPermissions(true)
                 .setNewCommandTimeout(Duration.ofSeconds(300));
 
+        resolveAppCapability(options);
+
         // CRITICAL for the Verona app: it runs a continuous animation, so the UI
         // never reports "idle". Without this, every findElement blocks ~10s and
         // `adb shell uiautomator dump` fails with "could not get idle state".
@@ -100,6 +102,33 @@ public final class DriverFactory {
         // 60s (default 240s) so the test layer can rebuild the session quickly.
         options.setCapability("appium:uiautomator2ServerReadTimeout", 60000);
         return options;
+    }
+
+    /**
+     * appium:app only works when it points somewhere the Appium SERVER can
+     * reach. A local emulator's server runs on this machine, so a local
+     * apps/ path is fine — Appium reads it directly and, with noReset,
+     * skips reinstalling if the same build is already on the device.
+     *
+     * BestQ's grid server can't reach this machine's filesystem at all
+     * (confirmed live: it 502s with "does not exist or is not accessible"
+     * for a local path), so on the remote grid we only set appium:app when
+     * app.remote.url points to a build BestQ's server can fetch itself.
+     * Without that, the app must already be installed on the target device
+     * (e.g. via the BestQ dashboard) before running noReset sessions.
+     */
+    private static void resolveAppCapability(UiAutomator2Options options) {
+        String remoteUrl = System.getProperty("app.remote.url", GRID.getProperty("app.remote.url", ""));
+        if (!remoteUrl.isBlank()) {
+            options.setApp(remoteUrl);
+            return;
+        }
+        if (isRemoteGrid()) {
+            return;
+        }
+        options.setApp(AppProvisioner.resolve(
+                GRID.getProperty("app.file.name", "verona-staging.apk"),
+                System.getProperty("app.download.url", GRID.getProperty("app.download.url", ""))));
     }
 
     private static XCUITestOptions iosOptions() {
