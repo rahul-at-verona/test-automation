@@ -3,7 +3,10 @@ package club.verona.automation.pages.onboarding;
 import club.verona.automation.pages.BasePage;
 
 import club.verona.automation.pages.editors.UiSnapshot;
+import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
+import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +45,9 @@ public class LandingPage extends BasePage {
     public static final String TERMS_HEADING = "VERONA TERMS OF USE";
     public static final String PRIVACY_HEADING = "VERONA PRIVACY NOTICE";
 
+    private static final By HERO_TEXT_LOC = AppiumBy.xpath(
+            "//android.widget.HorizontalScrollView/android.view.ViewGroup/android.widget.TextView");
+
     public LandingPage(AppiumDriver driver) {
         super(driver);
     }
@@ -60,10 +66,13 @@ public class LandingPage extends BasePage {
 
     /** The hero text currently displayed, or null mid-transition. */
     public String getCurrentHeroText() {
-        UiSnapshot snap = UiSnapshot.capture(driver);
-        return HERO_TEXTS.stream()
-                .filter(t -> snap.firstByText(t) != null)
-                .findFirst().orElse(null);
+        try {
+            // getText() carries a trailing space after the second line (real
+            // app markup, not a locator artifact) — trim so it matches HERO_TEXTS.
+            return driver.findElement(HERO_TEXT_LOC).getText().trim();
+        } catch (NoSuchElementException e) {
+            return null;
+        }
     }
 
     /** Observes the rotating hero for the given time; returns distinct texts seen. */

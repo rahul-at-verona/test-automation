@@ -40,11 +40,12 @@ jobs:
           BESTQ_NEXUS_PASSWORD: ${{ secrets.BESTQ_NEXUS_PASSWORD }}
         # Grid credentials are passed as -D system properties (never written to
         # disk) so verona.local.properties, which holds them for local dev,
-        # never has to exist in CI.
+        # never has to exist in CI. Same pattern for the ReportPortal API key.
         run: |
           mvn -B test -Dtnt.use.local.grid=true -Dplatform=android \
             -Dtnt.local.grid.user="${{ secrets.TNT_LOCAL_GRID_USER }}" \
-            -Dtnt.local.grid.password="${{ secrets.TNT_LOCAL_GRID_PASSWORD }}"
+            -Dtnt.local.grid.password="${{ secrets.TNT_LOCAL_GRID_PASSWORD }}" \
+            -Drp.api.key="${{ secrets.RP_API_KEY }}"
 
       - name: Upload surefire reports
         if: always()

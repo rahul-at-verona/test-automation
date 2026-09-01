@@ -1,5 +1,6 @@
 package club.verona.automation.tests;
 
+import club.verona.automation.annotations.IntroductionScreenTests;
 import club.verona.automation.annotations.LandingPageTests;
 import club.verona.automation.annotations.LoggedInBaseTests;
 import club.verona.automation.annotations.OtpScreenTests;
@@ -9,6 +10,7 @@ import club.verona.automation.flows.LoginFlow;
 import club.verona.automation.pages.HomePage;
 import club.verona.automation.pages.onboarding.BrowserPage;
 import club.verona.automation.pages.onboarding.CountrySelectorPage;
+import club.verona.automation.pages.onboarding.IntroductionPage;
 import club.verona.automation.pages.onboarding.LandingPage;
 import club.verona.automation.pages.onboarding.OtpPage;
 import club.verona.automation.pages.onboarding.PhoneNumberPage;
@@ -28,6 +30,7 @@ import java.util.Set;
  *   - LandingPageTests        (hero rotation, legal links, CTA)
  *   - PhoneNumberScreenTests  (texts, country selector, validation, consent)
  *   - OtpScreenTests          (OTP UI + verification behaviour)
+ *   - IntroductionScreenTests (combined name + email screen, new signups only)
  *   - LoggedInBaseTests       (full login flow reaches Home)
  *
  * Each test carries a marker annotation for its origin AND a matching TestNG
@@ -74,6 +77,27 @@ public class OnboardingPageTests extends BaseTest {
         phone.enterPhoneNumber(TEST_PHONE);
         phone.tapContinue();
         return new OtpPage(driver).waitUntilLoaded();
+    }
+
+    /**
+     * Verifies OTP with a never-before-used phone number and lands on the
+     * introduction (name+email) screen. Unlike {@link #gotoOtpScreen()},
+     * this can't reuse {@code TEST_PHONE}: that number already has a
+     * profile, so verifying it skips straight past this screen to Home
+     * (see {@link LoginFlow}). A fresh number is generated per call so
+     * re-running these tests never hits an already-onboarded number.
+     */
+    private IntroductionPage gotoIntroductionScreen() {
+        PhoneNumberPage phone = gotoPhoneScreen();
+        phone.enterPhoneNumber(freshUnregisteredPhone());
+        phone.tapContinue();
+        new OtpPage(driver).waitUntilLoaded().submitValidOtp(VALID_OTP);
+        return new IntroductionPage(driver).waitUntilLoaded();
+    }
+
+    private static String freshUnregisteredPhone() {
+        long suffix = Math.abs((System.nanoTime() ^ System.currentTimeMillis()) % 1_000_000_000L);
+        return String.format("9%09d", suffix);
     }
 
     // =====================================================================
@@ -338,11 +362,44 @@ public class OnboardingPageTests extends BaseTest {
     }
 
     // =====================================================================
+    // Introduction screen (combined name + email, new signups only)
+    // =====================================================================
+
+    @IntroductionScreenTests
+    @Test(groups = {"OnboardingPageTests", "IntroductionScreenTests"}, priority = 31,
+            description = "Combined name+email screen shows both sections and disables Continue until filled")
+    public void testIntroductionScreenLoadsWithNameAndEmailSections() {
+        IntroductionPage intro = gotoIntroductionScreen();
+        Assert.assertTrue(intro.isLoaded(), "'" + IntroductionPage.HEADER + "' header should be visible");
+        Assert.assertTrue(intro.isNameSectionVisible(),
+                "'" + IntroductionPage.NAME_SECTION_LABEL + "' section should be visible");
+        Assert.assertTrue(intro.isNameHelperTextVisible(), "Name helper text should be visible");
+        Assert.assertTrue(intro.isEmailSectionVisible(),
+                "'" + IntroductionPage.EMAIL_SECTION_LABEL + "' section should be visible");
+        Assert.assertFalse(intro.isContinueEnabled(),
+                "'Continue' should be disabled before name and email are filled");
+    }
+
+    @IntroductionScreenTests
+    @Test(groups = {"OnboardingPageTests", "IntroductionScreenTests"}, priority = 32,
+            description = "Filling first name, last name and email enables Continue and advances past the screen")
+    public void testIntroductionCompletingNameAndEmailAdvances() {
+        IntroductionPage intro = gotoIntroductionScreen();
+        intro.enterFirstName("Test");
+        intro.enterLastName("User");
+        intro.enterEmail("qa.test." + System.currentTimeMillis() + "@example.com");
+        Assert.assertTrue(intro.isContinueEnabled(),
+                "'Continue' should enable once first name, last name and email are filled");
+        intro.tapContinue();
+        Assert.assertFalse(intro.isLoaded(), "Should leave the introduction screen after Continue");
+    }
+
+    // =====================================================================
     // Full login flow (originates from LoggedInBaseTest)
     // =====================================================================
 
     @LoggedInBaseTests
-    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 31,
+    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 41,
             description = "Full login (landing -> phone -> OTP -> interstitials) reaches Home")
     public void testFullLoginReachesHome() {
         HomePage home = LoginFlow.login(driver);

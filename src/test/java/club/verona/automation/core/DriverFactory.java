@@ -74,7 +74,7 @@ public final class DriverFactory {
                 .setUdid(resolveUdid())
                 .setAppPackage("club.verona")
                 .setAppActivity("club.verona.MainActivity")
-                .setNoReset(true)                       // keep logged-in state
+//                .setNoReset(true)                       // keep logged-in state
                 .setAutoGrantPermissions(true)
                 .setNewCommandTimeout(Duration.ofSeconds(300));
 
@@ -172,8 +172,10 @@ public final class DriverFactory {
      */
     public static void clearAppStorage() {
         if (isRemoteGrid()) {
+            System.out.println("Rahullllllllllll");
             return; // remote sessions are reset via the noReset/fullReset capability instead
         }
+        System.out.println("Deepikaaaaaaaad");
         runAdb("shell", "pm", "clear", "club.verona");
     }
 
