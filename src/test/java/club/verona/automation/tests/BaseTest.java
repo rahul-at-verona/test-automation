@@ -2,6 +2,7 @@ package club.verona.automation.tests;
 
 import club.verona.automation.core.DriverFactory;
 import io.appium.java_client.AppiumDriver;
+import io.appium.java_client.android.AndroidDriver;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 
@@ -19,8 +20,12 @@ public abstract class BaseTest {
     public void setUp() {
         // Every suite starts logged out. Clearing here (once per class) means
         // classes that don't reset per-method still get a clean slate.
-        DriverFactory.clearAppStorage();
+        // Clearing needs a live session (the BestQ grid has no local adb
+        // access, so it clears via the session's own driver), so create the
+        // session first, then wipe storage and relaunch into the fresh state.
         driver = createFreshSession();
+        DriverFactory.clearAppStorage(driver);
+        ((AndroidDriver) driver).activateApp("club.verona");
     }
 
     @AfterClass(alwaysRun = true)
@@ -36,6 +41,7 @@ public abstract class BaseTest {
         try {
             driver = DriverFactory.create();
         } catch (Exception first) {
+            System.out.println("Rahullll erooor "+first.getMessage());
             DriverFactory.cleanupInstrumentation();
             pause(10_000);
             driver = DriverFactory.create();

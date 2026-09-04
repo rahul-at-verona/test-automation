@@ -60,7 +60,7 @@ public class OnboardingPageTests extends BaseTest {
         if (firstMethod) {
             firstMethod = false; // @BeforeClass already gave us a fresh landing
         } else {
-            DriverFactory.clearAppStorage();
+            DriverFactory.clearAppStorage(driver);
             ((AndroidDriver) driver).activateApp("club.verona");
         }
         landingPage = new LandingPage(driver).waitUntilLoaded();
@@ -103,9 +103,8 @@ public class OnboardingPageTests extends BaseTest {
     // =====================================================================
     // Landing page
     // =====================================================================
-
     @LandingPageTests
-    @Test(groups = {"OnboardingPageTests", "LandingPageTests"}, priority = 1,
+    @Test(groups = {"OnboardingPageTests", "LandingPageTests","Regression"}, priority = 1,
             description = "Landing page shows CTA, legal links and a hero text")
     public void testLandingPageLoads() {
         Assert.assertTrue(landingPage.isLoaded(), "'Continue with phone number' should be visible");
@@ -307,7 +306,7 @@ public class OnboardingPageTests extends BaseTest {
     }
 
     @OtpScreenTests
-    @Test(groups = {"OnboardingPageTests", "OtpScreenTests"}, priority = 24,
+    @Test(groups = {"OnboardingPageTests", "OtpScreenTests","Regression"}, priority = 24,
             description = "Edit affordance is displayed")
     public void testOtpEditDisplayed() {
         Assert.assertTrue(gotoOtpScreen().isEditDisplayed(), "'Edit' should be displayed");

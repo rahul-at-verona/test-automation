@@ -166,17 +166,22 @@ public final class DriverFactory {
     }
 
     /**
-     * Clears all app data (`adb shell pm clear club.verona`) so the next
-     * launch starts logged out at the landing screen. Call BEFORE creating the
-     * session (forceAppLaunch then cold-starts into the fresh state).
+     * Clears all app data so the next launch starts logged out at the landing
+     * screen. Locally this is `adb shell pm clear club.verona`, called BEFORE
+     * the session exists (forceAppLaunch then cold-starts into the fresh
+     * state). On the BestQ grid there's no local adb access to the device, so
+     * it goes through the Appium session itself via the UiAutomator2 driver's
+     * `mobile: clearApp` extension — which requires an active session, so the
+     * caller must pass one (and relaunch the app afterward; clearing kills it).
      */
-    public static void clearAppStorage() {
+    public static void clearAppStorage(AppiumDriver driver) {
+
+        driver.executeScript("mobile: clearApp", java.util.Map.of("appId", "club.verona"));
         if (isRemoteGrid()) {
-            System.out.println("Rahullllllllllll");
-            return; // remote sessions are reset via the noReset/fullReset capability instead
+            System.out.println("Clearing app storage on Remote Grid");
+            return;
         }
-        System.out.println("Deepikaaaaaaaad");
-        runAdb("shell", "pm", "clear", "club.verona");
+        System.out.println("Clearing app storage on Local emulator");
     }
 
     private static void runAdb(String... args) {

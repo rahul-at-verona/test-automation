@@ -1,6 +1,8 @@
 target/
 .idea/
 .DS_Store
+reportportal.lock
+reportportal.sync
 
 
 # local secrets — real credentials live only on each dev's machine / CI secrets
