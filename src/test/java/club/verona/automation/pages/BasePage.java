@@ -86,7 +86,7 @@ public abstract class BasePage {
      * text is on screen (native UiScrollable — reliable on the profile
      * ScrollView, unlike coordinate swipes).
      */
-    protected void scrollIntoViewByText(String text) {
+    public void scrollIntoViewByText(String text) {
         driver.findElement(AppiumBy.androidUIAutomator(
                 "new UiScrollable(new UiSelector().scrollable(true))"
                         + ".scrollIntoView(new UiSelector().text(\"" + text + "\"))"));

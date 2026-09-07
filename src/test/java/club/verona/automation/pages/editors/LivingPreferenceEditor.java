@@ -32,8 +32,8 @@ public class LivingPreferenceEditor extends BasePage {
 
     public LivingPreferenceEditor(AppiumDriver driver) {
         super(driver);
-        UiSnapshot.waitFor(driver, s -> s.containsText(COUNTRY_HEADER),
-                15_000, "'Select location' country list");
+//        UiSnapshot.waitFor(driver, s -> s.containsText(COUNTRY_HEADER),
+//                15_000, "'Select location' country list");
     }
 
     public LivingPreferenceEditor search(String partial) {

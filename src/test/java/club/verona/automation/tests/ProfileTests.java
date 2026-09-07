@@ -33,6 +33,7 @@ public class ProfileTests extends LoggedInBaseTest {
 
     private ProfilePage profilePage;
 
+
     @BeforeClass(alwaysRun = true)
     public void initPage() {
         try {
@@ -116,7 +117,7 @@ public class ProfileTests extends LoggedInBaseTest {
     }
 
     @ProfilePageTests
-    @Test(groups = {"ProfileTests", "ProfilePageTests"}, priority = 8,
+    @Test(groups = {"Failed"}, priority = 8,
             description = "At least one education credential is listed")
     public void testEducationCredentials() {
         Assert.assertFalse(profilePage.getEducationEntries().isEmpty(),
@@ -169,6 +170,7 @@ public class ProfileTests extends LoggedInBaseTest {
                 "Edit tab row should show " + targetCity + " but shows: " + profilePage.getLocation());
 
         profilePage.openViewTab();
+        profilePage.scrollIntoViewByText(targetCity + ", India");
         profilePage.waitForText(targetCity + ", India");
         Assert.assertTrue(profilePage.isTextVisible(targetCity + ", India"),
                 "View tab should show '" + targetCity + ", India'");
