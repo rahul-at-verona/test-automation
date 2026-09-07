@@ -91,7 +91,7 @@
         <dependency>
             <groupId>com.bestq.base</groupId>
             <artifactId>bestqtestframework</artifactId>
-            <version>3.0.0</version>
+            <version>3.0.1</version>
             <exclusions>
                 <!--
                   bestqtestframework -> logger-java-log4j pulls in the standalone

@@ -45,7 +45,8 @@ jobs:
           mvn -B -e test -Dtnt.use.local.grid=true -Dplatform=android \
             -Dtnt.local.grid.user="${{ secrets.TNT_LOCAL_GRID_USER }}" \
             -Dtnt.local.grid.password="${{ secrets.TNT_LOCAL_GRID_PASSWORD }}" \
-            -Drp.api.key="${{ secrets.RP_API_KEY }}"
+            -Drp.api.key="${{ secrets.RP_API_KEY }}" \
+            -Dgroups=ProfileTesters
 
       - name: Upload surefire reports
         if: always()
