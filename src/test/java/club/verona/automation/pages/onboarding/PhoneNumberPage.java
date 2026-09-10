@@ -2,11 +2,16 @@ package club.verona.automation.pages.onboarding;
 
 import club.verona.automation.pages.BasePage;
 
-import club.verona.automation.pages.editors.UiSnapshot;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * "What's your phone number?" screen (opened from the landing CTA).
@@ -25,20 +30,32 @@ public class PhoneNumberPage extends BasePage {
     public static final String PHONE_HINT = "Phone number";
     public static final String CONSENT_TEXT = "Connect with me on WhatsApp, SMS, or email.";
     public static final String NO_SPAM_TEXT_PREFIX = "No spam ever—pinky promise.";
-    public static final By PHONE_INPUT = AppiumBy.xpath("//android.widget.EditText");
+
+    private static final By HEADER_LOC = byText(HEADER);
+    private static final By CONTINUE_LOC = AppiumBy.accessibilityId(CONTINUE);
+    private static final By PHONE_INPUT = AppiumBy.xpath("//android.widget.EditText");
+    private static final By PHONE_HINT_LOC = byText(PHONE_HINT);
+    private static final By CONSENT_TEXT_LOC = byText(CONSENT_TEXT);
+    private static final By NO_SPAM_TEXT_LOC = AppiumBy.xpath(
+            "//*[starts-with(@text,'" + NO_SPAM_TEXT_PREFIX + "')]");
+    private static final By COUNTRY_CHIP_LOC = AppiumBy.xpath(
+            "//*[@clickable='true' and contains(@content-desc,'+')"
+            + " and string-length(@content-desc) < 20]");
+    private static final By PLUS_DESC_CANDIDATES_LOC = AppiumBy.xpath(
+            "//*[@clickable='true' and contains(@content-desc,'+')]");
+    private static final Pattern PLUS_CODE = Pattern.compile(".*\\+\\d{1,4}\\s*$");
 
     public PhoneNumberPage(AppiumDriver driver) {
         super(driver);
     }
 
     public PhoneNumberPage waitUntilLoaded() {
-        UiSnapshot.waitFor(driver, s -> s.containsText(HEADER),
-                15_000, "phone number screen");
+        newWait().until(ExpectedConditions.visibilityOfElementLocated(HEADER_LOC));
         return this;
     }
 
     public boolean isLoaded() {
-        return UiSnapshot.capture(driver).isTextDisplayed(HEADER);
+        return isDisplayed(HEADER_LOC);
     }
 
     /**
@@ -47,10 +64,11 @@ public class PhoneNumberPage extends BasePage {
      * so unrelated text that merely contains a '+' can never be picked up.
      */
     public String getCountryCode() {
-        UiSnapshot.Snap s = UiSnapshot.capture(driver)
-                .first(n -> n.clickable && n.desc != null
-                        && n.desc.matches(".*\\+\\d{1,4}\\s*$"));
-        return s != null ? s.desc : null;
+        return driver.findElements(PLUS_DESC_CANDIDATES_LOC).stream()
+                .map(el -> el.getAttribute("content-desc"))
+                .filter(desc -> desc != null && PLUS_CODE.matcher(desc).matches())
+                .findFirst()
+                .orElse(null);
     }
 
     public PhoneNumberPage enterPhoneNumber(String digits) {
@@ -60,69 +78,70 @@ public class PhoneNumberPage extends BasePage {
     }
 
     public String getEnteredNumber() {
-        UiSnapshot.Snap s = UiSnapshot.capture(driver)
-                .first(n -> n.cls.contains("EditText"));
-        return s != null ? s.text : null;
+        try {
+            return driver.findElement(PHONE_INPUT).getText();
+        } catch (NoSuchElementException e) {
+            return null;
+        }
     }
 
     /** The Continue button reports clickable=true only once input is valid. */
     public boolean isContinueEnabled() {
-        UiSnapshot.Snap s = UiSnapshot.capture(driver).firstByDesc(CONTINUE);
-        return s != null && s.clickable;
+        try {
+            return "true".equals(driver.findElement(CONTINUE_LOC).getAttribute("clickable"));
+        } catch (NoSuchElementException e) {
+            return false;
+        }
     }
 
     /** True if the phone input still shows its hint (i.e. it is empty). */
     public boolean isPhoneHintVisible() {
-        return UiSnapshot.capture(driver).isTextDisplayed(PHONE_HINT);
+        return isDisplayed(PHONE_HINT_LOC);
     }
 
     public boolean isConsentTextVisible() {
-        return UiSnapshot.capture(driver).isTextDisplayed(CONSENT_TEXT);
+        return isDisplayed(CONSENT_TEXT_LOC);
     }
 
     public boolean isNoSpamTextVisible() {
-        return UiSnapshot.capture(driver)
-                .first(n -> n.text != null && n.text.startsWith(NO_SPAM_TEXT_PREFIX)
-                        && n.displayed) != null;
+        return isDisplayed(NO_SPAM_TEXT_LOC);
     }
 
     /** Taps Continue (caller must have entered a valid number + kept consent). */
     public void tapContinue() {
-        clickByDesc(CONTINUE);
+        click(CONTINUE_LOC);
     }
 
     /** Opens the country-code selector modal by tapping the +XX chip. */
     public CountrySelectorPage openCountrySelector() {
-        click(AppiumBy.xpath(
-                "//*[@clickable='true' and contains(@content-desc,'+')"
-                + " and string-length(@content-desc) < 20]"));
+        click(COUNTRY_CHIP_LOC);
         return new CountrySelectorPage(driver).waitUntilLoaded();
     }
 
     /**
      * Toggles the WhatsApp/SMS consent checkbox: the unlabeled clickable
-     * ViewGroup immediately LEFT of the consent text (found by geometry —
-     * its center y matches the text row and it sits before the text).
+     * element immediately LEFT of the consent text (found by geometry — its
+     * center y matches the text row and it sits before the text). Verified
+     * live: it is not a sibling of the consent text in the tree, and no
+     * label/id exists, so no direct locator can target it — position among
+     * the clickable elements is the only reliable way to find it.
      */
     public PhoneNumberPage toggleConsentCheckbox() {
-        // REVERTED to geometry + coordinate tap: the checkbox is an unlabeled
-        // ViewGroup that is NOT a sibling of the consent text in the tree, so
-        // no stable element locator exists (verified: the preceding-sibling
-        // XPath finds nothing). Discovery by position is the reliable way.
-        UiSnapshot snap = UiSnapshot.capture(driver);
-        UiSnapshot.Snap textNode = snap.first(n -> CONSENT_TEXT.equals(n.text));
-        if (textNode == null) {
-            throw new IllegalStateException("Consent text not found");
-        }
-        UiSnapshot.Snap checkbox = snap.first(n -> n.clickable
-                && (n.desc == null || n.desc.isEmpty())
-                && (n.text == null || n.text.isEmpty())
-                && Math.abs(n.cy - textNode.cy) < 50
-                && n.cx < textNode.cx);
-        if (checkbox == null) {
-            throw new IllegalStateException("Consent checkbox not found");
-        }
-        tapByCoordinates(checkbox);
+        Rectangle textRect = driver.findElement(CONSENT_TEXT_LOC).getRect();
+        int textCenterY = textRect.getY() + textRect.getHeight() / 2;
+        int textCenterX = textRect.getX() + textRect.getWidth() / 2;
+
+        WebElement checkbox = driver.findElements(AppiumBy.xpath("//*[@clickable='true']")).stream()
+                .filter(el -> isBlank(el.getAttribute("content-desc")) && isBlank(el.getText()))
+                .filter(el -> {
+                    Rectangle r = el.getRect();
+                    int cy = r.getY() + r.getHeight() / 2;
+                    int cx = r.getX() + r.getWidth() / 2;
+                    return Math.abs(cy - textCenterY) < 50 && cx < textCenterX;
+                })
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Consent checkbox not found"));
+        checkbox.click();
         pause(1_500);
         return this;
     }
@@ -131,13 +150,15 @@ public class PhoneNumberPage extends BasePage {
     public LandingPage backToLanding() {
         for (int i = 0; i < 3; i++) {
             driver.navigate().back();
-            UiSnapshot.sleep(1500);
-            UiSnapshot snap = UiSnapshot.capture(driver);
-            if (!snap.containsText(HEADER)
-                    && snap.firstByDesc(LandingPage.CONTINUE_WITH_PHONE) != null) {
+            pause(1500);
+            if (!isDisplayed(HEADER_LOC) && isDisplayed(AppiumBy.accessibilityId(LandingPage.CONTINUE_WITH_PHONE))) {
                 break;
             }
         }
         return new LandingPage(driver);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isEmpty();
     }
 }

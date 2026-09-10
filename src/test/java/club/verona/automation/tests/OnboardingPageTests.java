@@ -5,15 +5,20 @@ import club.verona.automation.annotations.LandingPageTests;
 import club.verona.automation.annotations.LoggedInBaseTests;
 import club.verona.automation.annotations.OtpScreenTests;
 import club.verona.automation.annotations.PhoneNumberScreenTests;
+import club.verona.automation.annotations.ProfileForScreenTests;
 import club.verona.automation.core.DriverFactory;
 import club.verona.automation.flows.LoginFlow;
 import club.verona.automation.pages.HomePage;
 import club.verona.automation.pages.onboarding.BrowserPage;
 import club.verona.automation.pages.onboarding.CountrySelectorPage;
+import club.verona.automation.pages.onboarding.CreateMemberProfilePage;
 import club.verona.automation.pages.onboarding.IntroductionPage;
+import club.verona.automation.pages.onboarding.InviteMemberPage;
+import club.verona.automation.pages.onboarding.JoinTheClubPage;
 import club.verona.automation.pages.onboarding.LandingPage;
 import club.verona.automation.pages.onboarding.OtpPage;
 import club.verona.automation.pages.onboarding.PhoneNumberPage;
+import club.verona.automation.pages.onboarding.WhosThisProfileForPage;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.OutputType;
 import org.testng.Assert;
@@ -93,6 +98,20 @@ public class OnboardingPageTests extends BaseTest {
         phone.tapContinue();
         new OtpPage(driver).waitUntilLoaded().submitValidOtp(VALID_OTP);
         return new IntroductionPage(driver).waitUntilLoaded();
+    }
+
+    /**
+     * Completes the introduction screen with disposable test data and lands
+     * on {@link WhosThisProfileForPage}. Uses a fresh unregistered phone per
+     * call (see {@link #gotoIntroductionScreen()}).
+     */
+    private WhosThisProfileForPage gotoWhosThisProfileForScreen() {
+        IntroductionPage intro = gotoIntroductionScreen();
+        intro.enterFirstName("Test");
+        intro.enterLastName("User");
+        intro.enterEmail("qa.test." + System.currentTimeMillis() + "@example.com");
+        intro.tapContinue();
+        return new WhosThisProfileForPage(driver).waitUntilLoaded();
     }
 
     private static String freshUnregisteredPhone() {
@@ -394,11 +413,183 @@ public class OnboardingPageTests extends BaseTest {
     }
 
     // =====================================================================
+    // "Who's this profile for?" screen (member-type picker) — my-sibling flow
+    // =====================================================================
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 33,
+            description = "'Who's this profile for?' loads with selector, helper texts and disabled Continue")
+    public void testWhosThisProfileForScreenLoads() {
+        WhosThisProfileForPage page = gotoWhosThisProfileForScreen();
+        Assert.assertTrue(page.isLoaded(), "'" + WhosThisProfileForPage.HEADER + "' header should be visible");
+        Assert.assertTrue(page.isSelectorVisible(), "'Select member' selector should be visible");
+        Assert.assertTrue(page.areHelperTextsVisible(), "Both helper texts should be visible");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should be disabled before a member type is chosen");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 34,
+            description = "Opening the selector reveals all 4 member-type options")
+    public void testSelectorRevealsAllFourMemberOptions() {
+        WhosThisProfileForPage page = gotoWhosThisProfileForScreen().openSelector();
+        Assert.assertTrue(page.isOptionVisible(WhosThisProfileForPage.MYSELF), "'Myself' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(WhosThisProfileForPage.MY_CHILD), "'My child' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(WhosThisProfileForPage.MY_SIBLING), "'My sibling' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(WhosThisProfileForPage.SOMEONE_ELSE), "'Someone else' option should be visible");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 35,
+            description = "Selecting 'My sibling' updates the selector label and enables Continue")
+    public void testSelectingMySiblingEnablesContinue() {
+        WhosThisProfileForPage page = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MY_SIBLING);
+        Assert.assertEquals(page.getSelectorLabel(), WhosThisProfileForPage.MY_SIBLING,
+                "Selector should show the chosen option");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once a member type is chosen");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 36,
+            description = "My sibling: Continue opens 'Create profile' with name + phone fields")
+    public void testMySiblingOpensCreateProfileScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MY_SIBLING)
+                .tapContinue();
+
+        Assert.assertTrue(createPage.isLoaded(), "'" + CreateMemberProfilePage.HEADER + "' header should be visible");
+        Assert.assertTrue(createPage.isSubHeaderVisible(),
+                "'" + CreateMemberProfilePage.SUB_HEADER + "' sub-header should be visible");
+        String countryCode = createPage.getCountryCode();
+        Assert.assertNotNull(countryCode, "Country code chip should be visible");
+        Assert.assertTrue(countryCode.contains("+91"), "Country code should default to +91 but was: " + countryCode);
+        Assert.assertFalse(createPage.isContinueEnabled(),
+                "'Continue' should be disabled before name and phone are filled");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 37,
+            description = "My sibling: completing name + phone advances to the invite screen")
+    public void testMySiblingCreateProfileAdvancesToInviteScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MY_SIBLING)
+                .tapContinue();
+
+        InviteMemberPage invite = createPage.completeWith("Sib", "Ling", freshUnregisteredPhone());
+
+        Assert.assertTrue(invite.isLoaded(), "'" + InviteMemberPage.HEADER + "' header should be visible");
+        Assert.assertTrue(invite.isBodyTextVisible(), "Body text should be visible");
+        Assert.assertTrue(invite.isInviteCtaVisible(), "'" + InviteMemberPage.INVITE_CTA + "' should be visible");
+        Assert.assertTrue(invite.isShareVisible(), "'Share' control should be visible");
+        Assert.assertTrue(invite.isTextConciergeVisible(), "'Text Verona Concierge' control should be visible");
+        Assert.assertTrue(invite.isSignedUpOnBehalfTextVisible(InviteMemberPage.RELATION_SIBLING),
+                "Confirmation text should name 'sibling' as the relation");
+        Assert.assertTrue(invite.isLogOutVisible(), "'Log out' should be visible");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 38,
+            description = "My child: Continue opens 'Create profile' with name + phone fields")
+    public void testMyChildOpensCreateProfileScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MY_CHILD)
+                .tapContinue();
+
+        Assert.assertTrue(createPage.isLoaded(), "'" + CreateMemberProfilePage.HEADER + "' header should be visible");
+        Assert.assertTrue(createPage.isSubHeaderVisible(),
+                "'" + CreateMemberProfilePage.SUB_HEADER + "' sub-header should be visible");
+        Assert.assertFalse(createPage.isContinueEnabled(),
+                "'Continue' should be disabled before name and phone are filled");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 39,
+            description = "My child: completing name + phone advances to the invite screen")
+    public void testMyChildCreateProfileAdvancesToInviteScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MY_CHILD)
+                .tapContinue();
+
+        InviteMemberPage invite = createPage.completeWith("Kid", "Doe", freshUnregisteredPhone());
+
+        Assert.assertTrue(invite.isLoaded(), "'" + InviteMemberPage.HEADER + "' header should be visible");
+        Assert.assertTrue(invite.isSignedUpOnBehalfTextVisible(InviteMemberPage.RELATION_CHILD),
+                "Confirmation text should name 'child' as the relation");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 40,
+            description = "Someone else: Continue opens 'Create profile' with name + phone fields")
+    public void testSomeoneElseOpensCreateProfileScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.SOMEONE_ELSE)
+                .tapContinue();
+
+        Assert.assertTrue(createPage.isLoaded(), "'" + CreateMemberProfilePage.HEADER + "' header should be visible");
+        Assert.assertTrue(createPage.isSubHeaderVisible(),
+                "'" + CreateMemberProfilePage.SUB_HEADER + "' sub-header should be visible");
+        Assert.assertFalse(createPage.isContinueEnabled(),
+                "'Continue' should be disabled before name and phone are filled");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 41,
+            description = "Someone else: completing name + phone advances to the invite screen")
+    public void testSomeoneElseCreateProfileAdvancesToInviteScreen() {
+        CreateMemberProfilePage createPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.SOMEONE_ELSE)
+                .tapContinue();
+
+        InviteMemberPage invite = createPage.completeWith("Some", "One", freshUnregisteredPhone());
+
+        Assert.assertTrue(invite.isLoaded(), "'" + InviteMemberPage.HEADER + "' header should be visible");
+        Assert.assertTrue(invite.isSignedUpOnBehalfTextVisible(InviteMemberPage.RELATION_SOMEONE_ELSE),
+                "Confirmation text should name 'relative' as the relation");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 42,
+            description = "Selecting 'Myself' updates the selector label and enables Continue")
+    public void testSelectingMyselfEnablesContinue() {
+        WhosThisProfileForPage page = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MYSELF);
+        Assert.assertEquals(page.getSelectorLabel(), WhosThisProfileForPage.MYSELF,
+                "Selector should show the chosen option");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once a member type is chosen");
+    }
+
+    @ProfileForScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfileForScreenTests"}, priority = 43,
+            description = "Myself: Continue dismisses the notification-permission dialog and opens 'Join the Club'")
+    public void testMyselfOpensJoinTheClubScreen() {
+        JoinTheClubPage joinPage = gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MYSELF)
+                .tapContinueAsMyself();
+
+        Assert.assertTrue(joinPage.isLoaded(), "'" + JoinTheClubPage.HEADER + "' header should be visible");
+        Assert.assertTrue(joinPage.areTextsVisible(), "All 'Join the Club' body texts should be visible");
+        Assert.assertTrue(joinPage.isStartApplicationVisible(),
+                "'" + JoinTheClubPage.START_APPLICATION + "' should be visible");
+        Assert.assertTrue(joinPage.isStartApplicationEnabled(),
+                "'" + JoinTheClubPage.START_APPLICATION + "' should be enabled");
+    }
+
+    // =====================================================================
     // Full login flow (originates from LoggedInBaseTest)
     // =====================================================================
 
     @LoggedInBaseTests
-    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 41,
+    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 51,
             description = "Full login (landing -> phone -> OTP -> interstitials) reaches Home")
     public void testFullLoginReachesHome() {
         HomePage home = LoginFlow.login(driver);

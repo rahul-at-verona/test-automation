@@ -2,12 +2,14 @@ package club.verona.automation.pages.onboarding;
 
 import club.verona.automation.pages.BasePage;
 
-import club.verona.automation.pages.editors.UiSnapshot;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
+import org.openqa.selenium.support.ui.ExpectedConditions;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,8 +24,8 @@ import java.util.Set;
  *     both open Chrome at verona.club
  *   - CTA 'Continue with phone number' (content-desc, clickable)
  *
- * The hero/background animate continuously, so ALL reads/taps here are
- * page-source/coordinate based (UiSnapshot) — proven not to hang.
+ * Locator-based throughout, including on the animated hero/background —
+ * verified live to resolve reliably despite the continuous rotation.
  */
 public class LandingPage extends BasePage {
 
@@ -45,6 +47,10 @@ public class LandingPage extends BasePage {
     public static final String TERMS_HEADING = "VERONA TERMS OF USE";
     public static final String PRIVACY_HEADING = "VERONA PRIVACY NOTICE";
 
+    private static final By CONTINUE_WITH_PHONE_LOC = AppiumBy.accessibilityId(CONTINUE_WITH_PHONE);
+    private static final By TERMS_OF_USE_LOC = AppiumBy.accessibilityId(TERMS_OF_USE);
+    private static final By PRIVACY_POLICY_LOC = AppiumBy.accessibilityId(PRIVACY_POLICY);
+    private static final By IMAGE_VIEWS_LOC = AppiumBy.xpath("//android.widget.ImageView");
     private static final By HERO_TEXT_LOC = AppiumBy.xpath(
             "//android.widget.HorizontalScrollView/android.view.ViewGroup/android.widget.TextView");
 
@@ -54,14 +60,14 @@ public class LandingPage extends BasePage {
 
     /** Waits for the landing screen after a fresh (logged-out) app launch. */
     public LandingPage waitUntilLoaded() {
-        UiSnapshot.waitFor(driver,
-                s -> s.firstByDesc(CONTINUE_WITH_PHONE) != null,
-                60_000, "landing page (Continue with phone number)");
+        WebDriverWait wait = new WebDriverWait(driver, Duration.ofSeconds(60));
+        wait.pollingEvery(Duration.ofSeconds(2));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(CONTINUE_WITH_PHONE_LOC));
         return this;
     }
 
     public boolean isLoaded() {
-        return UiSnapshot.capture(driver).isDescDisplayed(CONTINUE_WITH_PHONE);
+        return isDisplayed(CONTINUE_WITH_PHONE_LOC);
     }
 
     /** The hero text currently displayed, or null mid-transition. */
@@ -85,31 +91,29 @@ public class LandingPage extends BasePage {
             if (current != null) {
                 seen.add(current);
             }
-            UiSnapshot.sleep(1000);
+            pause(1000);
         }
         return seen;
     }
 
     /** Number of full-screen background ImageViews (one per carousel slide). */
     public long countBackgroundImages() {
-        return UiSnapshot.capture(driver).all().stream()
-                .filter(n -> n.cls.contains("ImageView"))
-                .count();
+        return driver.findElements(IMAGE_VIEWS_LOC).size();
     }
 
     public boolean isTermsOfUseVisible() {
-        return UiSnapshot.capture(driver).isDescDisplayed(TERMS_OF_USE);
+        return isDisplayed(TERMS_OF_USE_LOC);
     }
 
     public boolean isPrivacyPolicyVisible() {
-        return UiSnapshot.capture(driver).isDescDisplayed(PRIVACY_POLICY);
+        return isDisplayed(PRIVACY_POLICY_LOC);
     }
 
-    public void tapTermsOfUse()    { tapByDesc(TERMS_OF_USE); }
-    public void tapPrivacyPolicy() { tapByDesc(PRIVACY_POLICY); }
+    public void tapTermsOfUse()    { click(TERMS_OF_USE_LOC); }
+    public void tapPrivacyPolicy() { click(PRIVACY_POLICY_LOC); }
 
     public PhoneNumberPage tapContinueWithPhone() {
-        tapByDesc(CONTINUE_WITH_PHONE);
+        click(CONTINUE_WITH_PHONE_LOC);
         return new PhoneNumberPage(driver).waitUntilLoaded();
     }
 

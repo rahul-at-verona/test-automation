@@ -4,6 +4,7 @@ import club.verona.automation.pages.editors.UiSnapshot;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 import org.openqa.selenium.By;
+import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -90,6 +91,55 @@ public abstract class BasePage {
         driver.findElement(AppiumBy.androidUIAutomator(
                 "new UiScrollable(new UiSelector().scrollable(true))"
                         + ".scrollIntoView(new UiSelector().text(\"" + text + "\"))"));
+    }
+
+    // ---------------- locator-based reads ----------------
+
+    /** XPath matching any element whose exact 'text' attribute equals the given value. */
+    protected static By byText(String text) {
+        return AppiumBy.xpath("//*[@text=" + xpathLiteral(text) + "]");
+    }
+
+    /**
+     * Renders a string as an XPath 1.0 string literal, safe even when it
+     * contains apostrophes (XPath 1.0 has no escape character, so a value
+     * with both quote types must be split into a concat() of single- and
+     * double-quoted pieces).
+     */
+    private static String xpathLiteral(String text) {
+        if (!text.contains("'")) {
+            return "'" + text + "'";
+        }
+        if (!text.contains("\"")) {
+            return "\"" + text + "\"";
+        }
+        StringBuilder sb = new StringBuilder("concat(");
+        String[] parts = text.split("'", -1);
+        for (int i = 0; i < parts.length; i++) {
+            sb.append("'").append(parts[i]).append("'");
+            if (i < parts.length - 1) {
+                sb.append(", \"'\", ");
+            }
+        }
+        return sb.append(")").toString();
+    }
+
+    /** True if a locator resolves to a currently-displayed element. */
+    protected boolean isDisplayed(By locator) {
+        try {
+            return driver.findElement(locator).isDisplayed();
+        } catch (NoSuchElementException e) {
+            return false;
+        }
+    }
+
+    /** Reads the 'enabled' accessibility attribute of the located element (false if absent). */
+    protected boolean isEnabledAttr(By locator) {
+        try {
+            return "true".equals(driver.findElement(locator).getAttribute("enabled"));
+        } catch (NoSuchElementException e) {
+            return false;
+        }
     }
 
     // ---------------- snapshot reads & waits ----------------

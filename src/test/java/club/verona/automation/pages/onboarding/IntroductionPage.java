@@ -1,11 +1,11 @@
 package club.verona.automation.pages.onboarding;
 
 import club.verona.automation.pages.BasePage;
-import club.verona.automation.pages.editors.UiSnapshot;
 import io.appium.java_client.AppiumBy;
 import io.appium.java_client.AppiumDriver;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebElement;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 
 import java.util.List;
 
@@ -37,6 +37,11 @@ public class IntroductionPage extends BasePage {
     public static final String EMAIL_HINT = "youremail@example.com";
     public static final String CONTINUE = "Continue";
 
+    private static final By HEADER_LOC = byText(HEADER);
+    private static final By NAME_SECTION_LOC = byText(NAME_SECTION_LABEL);
+    private static final By NAME_HELPER_LOC = byText(NAME_HELPER_TEXT);
+    private static final By EMAIL_SECTION_LOC = byText(EMAIL_SECTION_LABEL);
+    private static final By CONTINUE_LOC = AppiumBy.accessibilityId(CONTINUE);
     private static final By EDIT_TEXTS = AppiumBy.className("android.widget.EditText");
     private static final int FIRST_NAME_INDEX = 0;
     private static final int MIDDLE_NAME_INDEX = 1;
@@ -48,17 +53,17 @@ public class IntroductionPage extends BasePage {
     }
 
     public IntroductionPage waitUntilLoaded() {
-        UiSnapshot.waitFor(driver, s -> s.containsText(HEADER), 15_000, "introduction (name+email) screen");
+        newWait().until(ExpectedConditions.visibilityOfElementLocated(HEADER_LOC));
         return this;
     }
 
     public boolean isLoaded() {
-        return UiSnapshot.capture(driver).isTextDisplayed(HEADER);
+        return isDisplayed(HEADER_LOC);
     }
 
-    public boolean isNameSectionVisible()   { return UiSnapshot.capture(driver).isTextDisplayed(NAME_SECTION_LABEL); }
-    public boolean isNameHelperTextVisible(){ return UiSnapshot.capture(driver).isTextDisplayed(NAME_HELPER_TEXT); }
-    public boolean isEmailSectionVisible()  { return UiSnapshot.capture(driver).isTextDisplayed(EMAIL_SECTION_LABEL); }
+    public boolean isNameSectionVisible()   { return isDisplayed(NAME_SECTION_LOC); }
+    public boolean isNameHelperTextVisible(){ return isDisplayed(NAME_HELPER_LOC); }
+    public boolean isEmailSectionVisible()  { return isDisplayed(EMAIL_SECTION_LOC); }
 
     public IntroductionPage enterFirstName(String value)  { fillField(FIRST_NAME_INDEX, value); return this; }
     public IntroductionPage enterMiddleName(String value) { fillField(MIDDLE_NAME_INDEX, value); return this; }
@@ -67,16 +72,11 @@ public class IntroductionPage extends BasePage {
 
     /** Continue reports its real enabled state via the 'enabled' attribute (verified live). */
     public boolean isContinueEnabled() {
-        UiSnapshot.Snap btn = UiSnapshot.capture(driver).first(n -> CONTINUE.equals(n.desc));
-        return btn != null && "true".equals(btn.element.getAttribute("enabled"));
+        return isEnabledAttr(CONTINUE_LOC);
     }
 
     public void tapContinue() {
-        UiSnapshot.Snap btn = UiSnapshot.capture(driver).first(n -> CONTINUE.equals(n.desc));
-        if (btn == null) {
-            throw new IllegalStateException("'Continue' not found on the introduction screen");
-        }
-        UiSnapshot.tap(driver, btn);
+        click(CONTINUE_LOC);
         pause(2_000);
     }
 

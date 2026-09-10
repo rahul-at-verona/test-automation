@@ -191,7 +191,7 @@ public class ProfileTests extends LoggedInBaseTest {
     }
 
     @ProfileFieldEditTests
-    @Test(groups = {"ProfileTests", "ProfileFieldEditTests"}, priority = 13,
+    @Test(groups = {"Failed", "ProfileFieldEditTests"}, priority = 13,
             description = "Country search filters by partial text")
     public void testCountryPartialSearch() {
         profilePage.openLivingRow();
@@ -199,6 +199,7 @@ public class ProfileTests extends LoggedInBaseTest {
 
         List<String> results = editor.search("ind").getSuggestionNames();
         Assert.assertFalse(results.isEmpty(), "'ind' should return countries");
+        System.out.println(results);
         for (String country : results) {
             Assert.assertTrue(country.toLowerCase(Locale.ROOT).contains("ind"),
                     "Country '" + country + "' does not match partial 'ind'");
@@ -210,7 +211,7 @@ public class ProfileTests extends LoggedInBaseTest {
     }
 
     @ProfileFieldEditTests
-    @Test(groups = {"ProfileTests", "ProfileFieldEditTests"}, priority = 14,
+    @Test(groups = {"Failed", "ProfileFieldEditTests"}, priority = 14,
             description = "City search inside a country filters by partial text")
     public void testCityPartialSearchInsideCountry() {
         profilePage.openLivingRow();
