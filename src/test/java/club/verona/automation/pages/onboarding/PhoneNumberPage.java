@@ -10,7 +10,6 @@ import org.openqa.selenium.Rectangle;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 
-import java.util.List;
 import java.util.regex.Pattern;
 
 /**

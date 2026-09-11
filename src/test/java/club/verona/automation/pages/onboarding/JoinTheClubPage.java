@@ -9,18 +9,15 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 /**
  * "Join the Club" screen — reached from {@link WhosThisProfileForPage}'s
  * Continue for the 'Myself' option (via {@link WhosThisProfileForPage#tapContinueAsMyself()}),
- * after the OS notification-permission dialog. Terminal screen of the
- * self-signup onboarding path: the actual member application (photos,
- * questionnaire, etc.) begins beyond 'Start application', which is out of
- * scope for these onboarding tests — not tapped.
+ * after the OS notification-permission dialog.
  *
  * Live dump structure (Myself path):
  *   - TextView 'Join the Club' (header)
  *   - TextView 'Our members are successful and intentional.'
  *   - TextView 'Let’s begin the journey of getting\nto know you.'
  *   - TextView 'Next few steps are important. Be accurate as you’ll have to verify it later'
- *   - ViewGroup content-desc 'Start application' (clickable) — NOT tapped by
- *     tests (opens the full member-application flow, out of scope)
+ *   - ViewGroup content-desc 'Start application' (clickable) — begins the
+ *     member application; advances to {@link YouIdentifyAsPage} (verified live).
  */
 public class JoinTheClubPage extends BasePage {
 
@@ -61,5 +58,12 @@ public class JoinTheClubPage extends BasePage {
     /** Start application reports its real enabled state via the 'enabled' attribute (verified live). */
     public boolean isStartApplicationEnabled() {
         return isEnabledAttr(START_APPLICATION_LOC);
+    }
+
+    /** Begins the member application; lands on {@link YouIdentifyAsPage}. */
+    public YouIdentifyAsPage tapStartApplication() {
+        click(START_APPLICATION_LOC);
+        pause(2_000);
+        return new YouIdentifyAsPage(driver).waitUntilLoaded();
     }
 }

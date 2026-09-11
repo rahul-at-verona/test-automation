@@ -1,10 +1,13 @@
 package club.verona.automation.tests;
 
+import club.verona.automation.annotations.EducationScreenTests;
+import club.verona.automation.annotations.GenderScreenTests;
 import club.verona.automation.annotations.IntroductionScreenTests;
 import club.verona.automation.annotations.LandingPageTests;
 import club.verona.automation.annotations.LoggedInBaseTests;
 import club.verona.automation.annotations.OtpScreenTests;
 import club.verona.automation.annotations.PhoneNumberScreenTests;
+import club.verona.automation.annotations.ProfessionScreenTests;
 import club.verona.automation.annotations.ProfileForScreenTests;
 import club.verona.automation.core.DriverFactory;
 import club.verona.automation.flows.LoginFlow;
@@ -12,13 +15,19 @@ import club.verona.automation.pages.HomePage;
 import club.verona.automation.pages.onboarding.BrowserPage;
 import club.verona.automation.pages.onboarding.CountrySelectorPage;
 import club.verona.automation.pages.onboarding.CreateMemberProfilePage;
+import club.verona.automation.pages.onboarding.EducationSearchPage;
 import club.verona.automation.pages.onboarding.IntroductionPage;
 import club.verona.automation.pages.onboarding.InviteMemberPage;
 import club.verona.automation.pages.onboarding.JoinTheClubPage;
 import club.verona.automation.pages.onboarding.LandingPage;
 import club.verona.automation.pages.onboarding.OtpPage;
 import club.verona.automation.pages.onboarding.PhoneNumberPage;
+import club.verona.automation.pages.onboarding.PostgraduateEducationPage;
+import club.verona.automation.pages.onboarding.ProfessionPage;
+import club.verona.automation.pages.onboarding.ProfessionSearchPage;
+import club.verona.automation.pages.onboarding.UndergraduateEducationPage;
 import club.verona.automation.pages.onboarding.WhosThisProfileForPage;
+import club.verona.automation.pages.onboarding.YouIdentifyAsPage;
 import io.appium.java_client.android.AndroidDriver;
 import org.openqa.selenium.OutputType;
 import org.testng.Assert;
@@ -585,11 +594,568 @@ public class OnboardingPageTests extends BaseTest {
     }
 
     // =====================================================================
+    // "You identify as" screen (gender picker) — Join the Club -> Start
+    // application, Myself path only
+    // =====================================================================
+
+    /**
+     * Drives 'Myself' all the way to {@link YouIdentifyAsPage}: Who's this
+     * profile for -> Myself -> notification dialog -> Join the Club ->
+     * Start application.
+     */
+    private YouIdentifyAsPage gotoYouIdentifyAsScreen() {
+        return gotoWhosThisProfileForScreen()
+                .openSelector()
+                .selectMemberType(WhosThisProfileForPage.MYSELF)
+                .tapContinueAsMyself()
+                .tapStartApplication();
+    }
+
+    @GenderScreenTests
+    @Test(groups = {"OnboardingPageTests", "GenderScreenTests"}, priority = 44,
+            description = "Start application opens 'You identify as' with selector, note and disabled Continue")
+    public void testStartApplicationOpensYouIdentifyAsScreen() {
+        YouIdentifyAsPage page = gotoYouIdentifyAsScreen();
+        Assert.assertTrue(page.isLoaded(), "'" + YouIdentifyAsPage.HEADER + "' header should be visible");
+        Assert.assertTrue(page.isSelectorVisible(), "'Gender' selector should be visible");
+        Assert.assertTrue(page.isCisgenderNoteVisible(), "Cisgender note should be visible");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should be disabled before a gender is chosen");
+    }
+
+    @GenderScreenTests
+    @Test(groups = {"OnboardingPageTests", "GenderScreenTests"}, priority = 45,
+            description = "Opening the selector reveals both 'Female' and 'Male' options")
+    public void testGenderSelectorRevealsBothOptions() {
+        YouIdentifyAsPage page = gotoYouIdentifyAsScreen().openSelector();
+        Assert.assertTrue(page.isOptionVisible(YouIdentifyAsPage.FEMALE), "'Female' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(YouIdentifyAsPage.MALE), "'Male' option should be visible");
+    }
+
+    @GenderScreenTests
+    @Test(groups = {"OnboardingPageTests", "GenderScreenTests"}, priority = 46,
+            description = "Selecting 'Female' updates the selector label and enables Continue")
+    public void testSelectingFemaleEnablesContinue() {
+        YouIdentifyAsPage page = gotoYouIdentifyAsScreen()
+                .openSelector()
+                .selectGender(YouIdentifyAsPage.FEMALE);
+        Assert.assertEquals(page.getSelectorLabel(), YouIdentifyAsPage.FEMALE,
+                "Selector should show the chosen option");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once a gender is chosen");
+    }
+
+    @GenderScreenTests
+    @Test(groups = {"OnboardingPageTests", "GenderScreenTests"}, priority = 47,
+            description = "Selecting 'Male' updates the selector label and enables Continue")
+    public void testSelectingMaleEnablesContinue() {
+        YouIdentifyAsPage page = gotoYouIdentifyAsScreen()
+                .openSelector()
+                .selectGender(YouIdentifyAsPage.MALE);
+        Assert.assertEquals(page.getSelectorLabel(), YouIdentifyAsPage.MALE,
+                "Selector should show the chosen option");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once a gender is chosen");
+    }
+
+    // =====================================================================
+    // Undergraduate / Postgraduate education screens — institute + degree
+    // search-and-select, 'Other' free-text fallback, Continue gating
+    // =====================================================================
+
+    /** Drives 'Myself' all the way to {@link UndergraduateEducationPage} (gender: Female). */
+    private UndergraduateEducationPage gotoUndergraduateEducationScreen() {
+        return gotoYouIdentifyAsScreen()
+                .openSelector()
+                .selectGender(YouIdentifyAsPage.FEMALE)
+                .tapContinue();
+    }
+
+    private static final String SAMPLE_UNIVERSITY = "AIIMS Rishikesh";
+    private static final String SAMPLE_DEGREE = "Bachelor of Architecture (BArch)";
+    // The postgraduate 'Field of Study' catalog lists master's/professional
+    // qualifications, not undergraduate degrees like SAMPLE_DEGREE (verified
+    // live — searching "Architecture" there returns nothing).
+    private static final String SAMPLE_PG_DEGREE = "Chartered Accountant (CA)";
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 48,
+            description = "Undergraduate education screen loads with both selectors and disabled Continue")
+    public void testUndergraduateScreenLoads() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        Assert.assertTrue(page.isLoaded(), "'" + UndergraduateEducationPage.HEADER + "' header should be visible");
+        Assert.assertTrue(page.isSubtitleVisible(), "Subtitle should be visible");
+        Assert.assertTrue(page.isUGExampleTextsVisible(), "Example Text should be visible");
+        Assert.assertTrue(page.isInstituteSelectorVisible(), "Institute selector should be visible");
+        Assert.assertTrue(page.isDegreeSelectorVisible(), "Degree selector should be visible");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should be disabled before institute and degree are resolved");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 49,
+            description = "Institute search modal loads, lists results and narrows by search text")
+    public void testInstituteSearchShowsResultsAndNarrowsBySearch() {
+        EducationSearchPage search = gotoUndergraduateEducationScreen().openInstituteSearch();
+        Assert.assertTrue(search.isLoaded(EducationSearchPage.UNIVERSITY_HEADING),
+                "'" + EducationSearchPage.UNIVERSITY_HEADING + "' heading should be visible");
+        Assert.assertTrue(search.isCloseButtonVisible(), "Close button should be visible");
+        Assert.assertTrue(search.isSearchBoxVisible(), "Search box should be visible");
+        Assert.assertFalse(search.getListedOptionNames().isEmpty(), "Universities should be listed by default");
+
+        List<String> results = search.search(SAMPLE_UNIVERSITY).getListedOptionNames();
+        Assert.assertTrue(results.contains(SAMPLE_UNIVERSITY),
+                "Searching '" + SAMPLE_UNIVERSITY + "' should list it, saw: " + results);
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 50,
+            description = "Selecting a real institute alone leaves Continue disabled (degree still unresolved)")
+    public void testSelectingInstituteOnlyKeepsContinueDisabled() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        page.openInstituteSearch().search(SAMPLE_UNIVERSITY).selectOption(SAMPLE_UNIVERSITY);
+        Assert.assertTrue(page.isOptionSelected(SAMPLE_UNIVERSITY),
+                "Institute selector should now show '" + SAMPLE_UNIVERSITY + "'");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled with only the institute resolved");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 51,
+            description = "Selecting 'Other' for institute reveals the free-text field, still disabling Continue until filled")
+    public void testSelectingOtherForInstituteRevealsExtraField() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        EducationSearchPage search = page.openInstituteSearch().search("other");
+        Assert.assertTrue(search.isOtherOptionVisible(), "'Other (Not listed above)' should be listed");
+        search.selectOther();
+
+        Assert.assertTrue(page.isOptionSelected(EducationSearchPage.OTHER_OPTION),
+                "Institute selector should now show 'Other (Not listed above)'");
+        Assert.assertTrue(page.isInstituteOtherFieldVisible(),
+                "Selecting 'Other' should reveal the '" + UndergraduateEducationPage.INSTITUTE_OTHER_HINT + "' field");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled while the 'Other' institute field is still empty");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 52,
+            description = "Degree search modal loads, lists results and narrows by search text")
+    public void testDegreeSearchShowsResultsAndNarrowsBySearch() {
+        EducationSearchPage search = gotoUndergraduateEducationScreen().openDegreeSearch();
+        Assert.assertTrue(search.isLoaded(EducationSearchPage.DEGREE_HEADING),
+                "'" + EducationSearchPage.DEGREE_HEADING + "' heading should be visible");
+        Assert.assertTrue(search.isCloseButtonVisible(), "Close button should be visible");
+        Assert.assertTrue(search.isSearchBoxVisible(), "Search box should be visible");
+        Assert.assertFalse(search.getListedOptionNames().isEmpty(), "Degrees should be listed by default");
+
+        List<String> results = search.search("Architecture").getListedOptionNames();
+        Assert.assertTrue(results.contains(SAMPLE_DEGREE),
+                "Searching 'Architecture' should list '" + SAMPLE_DEGREE + "', saw: " + results);
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 53,
+            description = "Selecting 'Other' for degree reveals the free-text field, still disabling Continue until filled")
+    public void testSelectingOtherForDegreeRevealsExtraField() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        EducationSearchPage search = page.openDegreeSearch().search("other");
+        Assert.assertTrue(search.isOtherOptionVisible(), "'Other (Not listed above)' should be listed");
+        search.selectOther();
+
+        Assert.assertTrue(page.isOptionSelected(EducationSearchPage.OTHER_OPTION),
+                "Degree selector should now show 'Other (Not listed above)'");
+        Assert.assertTrue(page.isDegreeOtherFieldVisible(),
+                "Selecting 'Other' should reveal the '" + UndergraduateEducationPage.DEGREE_OTHER_HINT + "' field");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled while the 'Other' degree field is still empty");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 54,
+            description = "Continue enables once both institute and degree are resolved with real selections")
+    public void testContinueEnablesWhenBothRealFieldsSelected() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        page.openInstituteSearch().search(SAMPLE_UNIVERSITY).selectOption(SAMPLE_UNIVERSITY);
+        Assert.assertFalse(page.isContinueEnabled(), "Precondition: degree still unresolved");
+        page.openDegreeSearch().search("Architecture").selectOption(SAMPLE_DEGREE);
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once both institute and degree are selected");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 55,
+            description = "Continue enables once both 'Other' free-text fields are filled")
+    public void testContinueEnablesWhenBothOtherFieldsFilled() {
+        UndergraduateEducationPage page = gotoUndergraduateEducationScreen();
+        page.openInstituteSearch().selectOther();
+        page.openDegreeSearch().selectOther();
+        Assert.assertFalse(page.isContinueEnabled(), "Precondition: both 'Other' fields still empty");
+
+        page.enterInstituteOtherText("My Custom Institute, Testville");
+        Assert.assertFalse(page.isContinueEnabled(), "Precondition: degree 'Other' field still empty");
+        page.enterDegreeOtherText("My Custom Degree");
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once both 'Other' free-text fields are filled");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 56,
+            description = "Completing undergraduate education advances to the postgraduate screen")
+    public void testUndergraduateContinueAdvancesToPostgraduateScreen() {
+        UndergraduateEducationPage ug = gotoUndergraduateEducationScreen();
+        ug.openInstituteSearch().search(SAMPLE_UNIVERSITY).selectOption(SAMPLE_UNIVERSITY);
+        ug.openDegreeSearch().search("Architecture").selectOption(SAMPLE_DEGREE);
+        PostgraduateEducationPage pg = ug.tapContinue();
+
+        Assert.assertTrue(pg.isLoaded(), "'" + PostgraduateEducationPage.HEADER + "' header should be visible");
+        Assert.assertTrue(pg.isSubtitleVisible(), "Subtitle should be visible");
+        Assert.assertTrue(pg.isInstituteSelectorVisible(), "Institute selector should be visible");
+        Assert.assertTrue(pg.isDegreeSelectorVisible(), "Degree selector should be visible");
+        Assert.assertTrue(pg.isNoDegreeOptOutVisible(), "'No postgraduate degree' opt-out should be visible");
+        Assert.assertFalse(pg.isContinueEnabled(),
+                "'Continue' should be disabled before institute/degree are resolved or the opt-out is checked");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 57,
+            description = "Postgraduate: checking 'no postgraduate degree' enables Continue without filling fields")
+    public void testNoPostgraduateDegreeEnablesContinueWithoutFillingFields() {
+        UndergraduateEducationPage ug = gotoUndergraduateEducationScreen();
+        ug.openInstituteSearch().selectOther();
+        ug.openDegreeSearch().selectOther();
+        ug.enterInstituteOtherText("My Custom Institute, Testville");
+        ug.enterDegreeOtherText("My Custom Degree");
+        PostgraduateEducationPage pg = ug.tapContinue();
+
+        pg.checkNoPostgraduateDegree();
+        Assert.assertTrue(pg.isContinueEnabled(),
+                "'Continue' should enable once 'no postgraduate degree' is checked, with no fields filled");
+    }
+
+    @EducationScreenTests
+    @Test(groups = {"OnboardingPageTests", "EducationScreenTests"}, priority = 58,
+            description = "Postgraduate: Continue enables once both institute and degree are resolved with real selections")
+    public void testPostgraduateContinueEnablesWhenBothRealFieldsSelected() {
+        UndergraduateEducationPage ug = gotoUndergraduateEducationScreen();
+        ug.openInstituteSearch().selectOther();
+        ug.openDegreeSearch().selectOther();
+        ug.enterInstituteOtherText("My Custom Institute, Testville");
+        ug.enterDegreeOtherText("My Custom Degree");
+        PostgraduateEducationPage pg = ug.tapContinue();
+
+        pg.openInstituteSearch().search(SAMPLE_UNIVERSITY).selectOption(SAMPLE_UNIVERSITY);
+        Assert.assertFalse(pg.isContinueEnabled(), "Precondition: PG degree still unresolved");
+        pg.openDegreeSearch().search("Chartered").selectOption(SAMPLE_PG_DEGREE);
+        Assert.assertTrue(pg.isContinueEnabled(),
+                "'Continue' should enable once both PG institute and degree are selected");
+    }
+
+    // =====================================================================
+    // "Your current profession" screen — 5 profession-type options, each
+    // with a different field set and Continue-gating rule (all verified
+    // live individually)
+    // =====================================================================
+
+    /** Drives 'Myself' all the way to {@link ProfessionPage} (UG/PG both via 'Other' + free text). */
+    private ProfessionPage gotoProfessionScreen() {
+        UndergraduateEducationPage ug = gotoUndergraduateEducationScreen();
+        ug.openInstituteSearch().selectOther();
+        ug.openDegreeSearch().selectOther();
+        ug.enterInstituteOtherText("My Custom Institute, Testville");
+        ug.enterDegreeOtherText("My Custom Degree");
+        PostgraduateEducationPage pg = ug.tapContinue();
+        pg.checkNoPostgraduateDegree();
+        return pg.tapContinue();
+    }
+
+    private static final String SAMPLE_ORGANIZATION_QUERY = "Google";
+    private static final String SAMPLE_ORGANIZATION = "Alphabet Google";
+    private static final String SAMPLE_ORGANIZATION_RESOLVED_LABEL = "Alphabet (Google)";
+    private static final String SAMPLE_DESIGNATION_QUERY = "Manager";
+    // Disambiguates the exact 'Manager' row from 'Manager Operations' etc. (verified live: trailing padding).
+    private static final String SAMPLE_DESIGNATION_EXACT_ROW = "Manager   ";
+    private static final String SAMPLE_DESIGNATION_RESOLVED_LABEL = "Manager";
+    private static final String SAMPLE_PROFESSION_QUERY = "Doctor";
+    private static final String SAMPLE_PROFESSION_ROW = "Ayurvedic Doctor";
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 59,
+            description = "Profession screen loads with all 5 options visible and disabled Continue")
+    public void testProfessionScreenLoadsWithAllFiveOptions() {
+        ProfessionPage page = gotoProfessionScreen();
+        Assert.assertTrue(page.isLoaded(), "'" + ProfessionPage.HEADER + "' header should be visible");
+        Assert.assertTrue(page.isOptionVisible(ProfessionPage.EMPLOYED), "'Employed' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(ProfessionPage.BUSINESS_OWNER), "'Business owner' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(ProfessionPage.SELF_EMPLOYED),
+                "'Self-employed / Independent professional' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(ProfessionPage.CURRENTLY_NOT_WORKING),
+                "'Currently not working' option should be visible");
+        Assert.assertTrue(page.isOptionVisible(ProfessionPage.STUDENT), "'Student' option should be visible");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before a profession is chosen");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 60,
+            description = "Employed shows Organization + example text + Designation + LinkedIn")
+    public void testSelectingEmployedShowsOrganizationDesignationAndLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.EMPLOYED);
+        Assert.assertTrue(page.isOrganizationSelectorVisible(), "Organization selector should be visible");
+        Assert.assertTrue(page.isOrganizationExampleTextVisible(), "Organization example text should be visible");
+        Assert.assertTrue(page.isDesignationSelectorVisible(), "Designation selector should be visible");
+        Assert.assertTrue(page.isLinkedInFieldVisible(), "LinkedIn field should be visible");
+        Assert.assertFalse(page.isSharePlatformNoteVisible(), "Share-platform note should NOT be shown for Employed");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before fields are resolved");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 61,
+            description = "Employed: Continue enables with Organization + Designation only, LinkedIn left empty")
+    public void testEmployedContinueEnablesWithOrganizationAndDesignationOnly() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.EMPLOYED);
+        page.openOrganizationSearch().search(SAMPLE_ORGANIZATION_QUERY).selectOption(SAMPLE_ORGANIZATION);
+        Assert.assertTrue(page.isOptionSelected(SAMPLE_ORGANIZATION_RESOLVED_LABEL),
+                "Organization selector should show '" + SAMPLE_ORGANIZATION_RESOLVED_LABEL + "'");
+        Assert.assertFalse(page.isContinueEnabled(), "Precondition: Designation still unresolved");
+
+        page.openDesignationSearch().search(SAMPLE_DESIGNATION_QUERY).selectOption(SAMPLE_DESIGNATION_EXACT_ROW);
+        Assert.assertTrue(page.isOptionSelected(SAMPLE_DESIGNATION_RESOLVED_LABEL),
+                "Designation selector should show '" + SAMPLE_DESIGNATION_RESOLVED_LABEL + "'");
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once Organization and Designation are resolved (LinkedIn left empty)");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 62,
+            description = "Business owner shows only Organization + LinkedIn + share-platform note (no Designation, no example text)")
+    public void testSelectingBusinessOwnerShowsOrganizationAndLinkedInOnly() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.BUSINESS_OWNER);
+        Assert.assertTrue(page.isOrganizationSelectorVisible(), "Organization selector should be visible");
+        Assert.assertFalse(page.isDesignationSelectorVisible(),
+                "Designation selector should NOT be shown for Business owner");
+        Assert.assertFalse(page.isOrganizationExampleTextVisible(),
+                "Organization example text should NOT be shown for Business owner");
+        Assert.assertTrue(page.isLinkedInFieldVisible(), "LinkedIn field should be visible");
+        Assert.assertTrue(page.isSharePlatformNoteVisible(), "Share-platform note should be visible for Business owner");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before Organization is resolved");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 63,
+            description = "Business owner: Continue enables with Organization alone, LinkedIn left empty")
+    public void testBusinessOwnerContinueEnablesWithOrganizationOnly() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.BUSINESS_OWNER);
+        page.openOrganizationSearch().search(SAMPLE_ORGANIZATION_QUERY).selectOption(SAMPLE_ORGANIZATION);
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once Organization is resolved — LinkedIn is optional for Business owner");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 64,
+            description = "Self-employed shows only Profession + LinkedIn + share-platform note")
+    public void testSelectingSelfEmployedShowsProfessionAndLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.SELF_EMPLOYED);
+        Assert.assertTrue(page.isProfessionSelectorVisible(), "Profession selector should be visible");
+        Assert.assertFalse(page.isOrganizationSelectorVisible(),
+                "Organization selector should NOT be shown for Self-employed");
+        Assert.assertTrue(page.isLinkedInFieldVisible(), "LinkedIn field should be visible");
+        Assert.assertTrue(page.isSharePlatformNoteVisible(), "Share-platform note should be visible");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before Profession is resolved");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 65,
+            description = "Self-employed: Continue requires BOTH Profession resolved AND LinkedIn filled")
+    public void testSelfEmployedContinueRequiresBothProfessionAndLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.SELF_EMPLOYED);
+        page.openProfessionSearch().search(SAMPLE_PROFESSION_QUERY).selectOption(SAMPLE_PROFESSION_ROW);
+        Assert.assertTrue(page.isOptionSelected(SAMPLE_PROFESSION_ROW),
+                "Profession selector should show '" + SAMPLE_PROFESSION_ROW + "'");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled with only Profession resolved — unlike Business owner's single "
+                + "selector, LinkedIn is required here too");
+
+        page.enterLinkedIn("https://www.linkedin.com/in/testuser");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once LinkedIn is also filled");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 66,
+            description = "Currently not working shows Previous organization + Previous designation + LinkedIn")
+    public void testSelectingCurrentlyNotWorkingShowsPreviousFieldsAndLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.CURRENTLY_NOT_WORKING);
+        Assert.assertTrue(page.isPreviousOrganizationSelectorVisible(),
+                "'Previous organization' selector should be visible");
+        Assert.assertTrue(page.isPreviousDesignationSelectorVisible(),
+                "'Previous designation' selector should be visible");
+        Assert.assertTrue(page.isLinkedInFieldVisible(), "LinkedIn field should be visible");
+        Assert.assertTrue(page.isSharePlatformNoteVisible(), "Share-platform note should be visible");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before fields are resolved");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 67,
+            description = "Currently not working: Continue requires BOTH previous fields AND LinkedIn filled")
+    public void testCurrentlyNotWorkingContinueRequiresBothPreviousFieldsAndLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.CURRENTLY_NOT_WORKING);
+        page.openPreviousOrganizationSearch().search(SAMPLE_ORGANIZATION_QUERY).selectOption(SAMPLE_ORGANIZATION);
+        page.openPreviousDesignationSearch().search(SAMPLE_DESIGNATION_QUERY).selectOption(SAMPLE_DESIGNATION_EXACT_ROW);
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled with both previous fields resolved but LinkedIn still empty");
+
+        page.enterLinkedIn("https://www.linkedin.com/in/testuser");
+        Assert.assertTrue(page.isContinueEnabled(), "'Continue' should enable once LinkedIn is also filled");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 68,
+            description = "Student shows only LinkedIn + share-platform note, no organization-style selector")
+    public void testSelectingStudentShowsOnlyLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.STUDENT);
+        Assert.assertTrue(page.isLinkedInFieldVisible(), "LinkedIn field should be visible");
+        Assert.assertTrue(page.isSharePlatformNoteVisible(), "Share-platform note should be visible");
+        Assert.assertFalse(page.isOrganizationSelectorVisible(), "No Organization selector should exist for Student");
+        Assert.assertFalse(page.isProfessionSelectorVisible(), "No Profession selector should exist for Student");
+        Assert.assertFalse(page.isPreviousOrganizationSelectorVisible(),
+                "No Previous organization selector should exist for Student");
+        Assert.assertFalse(page.isContinueEnabled(), "'Continue' should be disabled before LinkedIn is filled");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 69,
+            description = "Student: Continue requires LinkedIn — the only field for this option")
+    public void testStudentContinueRequiresLinkedIn() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.STUDENT);
+        Assert.assertFalse(page.isContinueEnabled(), "Precondition: LinkedIn empty");
+        page.enterLinkedIn("https://www.linkedin.com/in/testuser");
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once LinkedIn is filled (the only field for Student)");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 70,
+            description = "Organization search modal loads, lists results and narrows by search text")
+    public void testOrganizationSearchNarrowsResults() {
+        ProfessionSearchPage search = gotoProfessionScreen()
+                .selectProfession(ProfessionPage.EMPLOYED)
+                .openOrganizationSearch();
+        Assert.assertTrue(search.isLoaded(ProfessionSearchPage.ORGANIZATION_HEADING),
+                "'" + ProfessionSearchPage.ORGANIZATION_HEADING + "' heading should be visible");
+        Assert.assertTrue(search.isCloseButtonVisible(), "Close button should be visible");
+        Assert.assertTrue(search.isSearchBoxVisible(), "Search box should be visible");
+        Assert.assertFalse(search.getListedOptionNames().isEmpty(), "Organizations should be listed by default");
+
+        List<String> results = search.search(SAMPLE_ORGANIZATION_QUERY).getListedOptionNames();
+        Assert.assertTrue(results.stream().anyMatch(r -> r.startsWith(SAMPLE_ORGANIZATION)),
+                "Searching '" + SAMPLE_ORGANIZATION_QUERY + "' should list '" + SAMPLE_ORGANIZATION
+                        + "', saw: " + results);
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 71,
+            description = "Designation search modal loads, lists results and narrows by search text")
+    public void testDesignationSearchNarrowsResults() {
+        ProfessionSearchPage search = gotoProfessionScreen()
+                .selectProfession(ProfessionPage.EMPLOYED)
+                .openDesignationSearch();
+        Assert.assertTrue(search.isLoaded(ProfessionSearchPage.DESIGNATION_HEADING),
+                "'" + ProfessionSearchPage.DESIGNATION_HEADING + "' heading should be visible");
+        Assert.assertFalse(search.getListedOptionNames().isEmpty(), "Designations should be listed by default");
+
+        List<String> results = search.search(SAMPLE_DESIGNATION_QUERY).getListedOptionNames();
+        Assert.assertTrue(results.stream().anyMatch(r -> r.startsWith(SAMPLE_DESIGNATION_QUERY)),
+                "Searching '" + SAMPLE_DESIGNATION_QUERY + "' should list matching designations, saw: " + results);
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 72,
+            description = "Profession search modal's heading is plain 'Search', unlike Organization/Designation's field-specific headings")
+    public void testProfessionSearchModalHasGenericHeading() {
+        ProfessionSearchPage search = gotoProfessionScreen()
+                .selectProfession(ProfessionPage.SELF_EMPLOYED)
+                .openProfessionSearch();
+        Assert.assertTrue(search.isLoaded(ProfessionSearchPage.PROFESSION_HEADING),
+                "Profession search modal heading should be plain '" + ProfessionSearchPage.PROFESSION_HEADING + "'");
+
+        List<String> results = search.search(SAMPLE_PROFESSION_QUERY).getListedOptionNames();
+        Assert.assertTrue(results.stream().anyMatch(r -> r.startsWith(SAMPLE_PROFESSION_ROW)),
+                "Searching '" + SAMPLE_PROFESSION_QUERY + "' should list '" + SAMPLE_PROFESSION_ROW
+                        + "', saw: " + results);
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 73,
+            description = "LinkedIn field applies NO format validation — Continue's state is unaffected by its content")
+    public void testLinkedInAcceptsAnyTextNoFormatValidation() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.EMPLOYED);
+        page.openOrganizationSearch().search(SAMPLE_ORGANIZATION_QUERY).selectOption(SAMPLE_ORGANIZATION);
+        page.openDesignationSearch().search(SAMPLE_DESIGNATION_QUERY).selectOption(SAMPLE_DESIGNATION_EXACT_ROW);
+        Assert.assertTrue(page.isContinueEnabled(),
+                "Precondition: Continue already enabled with Organization+Designation, LinkedIn empty");
+
+        for (String value : new String[]{
+                "not a link at all",
+                "just some random words here",
+                "linkedin.com/in/testuser",
+                "https://www.linkedin.com/in/testuser"}) {
+            page.enterLinkedIn(value);
+            Assert.assertTrue(page.isContinueEnabled(),
+                    "'Continue' should stay enabled regardless of LinkedIn format — no validation is applied "
+                    + "(value: '" + value + "')");
+        }
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 74,
+            description = "Selecting 'Other' for Organization reveals a free-text field, distinct from the row's own label")
+    public void testSelectingOtherForOrganizationRevealsFreeTextField() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.EMPLOYED);
+        ProfessionSearchPage search = page.openOrganizationSearch().search("zzzznotarealorganization");
+        Assert.assertTrue(search.isOtherOptionVisible(),
+                "'Other Not Listed Above' should be listed even with no real matches");
+        search.selectOther();
+
+        Assert.assertTrue(page.isOptionSelected(ProfessionSearchPage.OTHER_SELECTED_LABEL),
+                "Organization selector should now show '" + ProfessionSearchPage.OTHER_SELECTED_LABEL + "'");
+        Assert.assertTrue(page.isOrganizationOtherFieldVisible(),
+                "Selecting 'Other' should reveal the '" + ProfessionPage.ORGANIZATION_OTHER_HINT + "' field");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled while the 'Other' organization field is still empty");
+
+        page.enterOrganizationOtherText("My Custom Organization Pvt Ltd");
+        page.openDesignationSearch().search(SAMPLE_DESIGNATION_QUERY).selectOption(SAMPLE_DESIGNATION_EXACT_ROW);
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once the 'Other' organization text and Designation are both resolved");
+    }
+
+    @ProfessionScreenTests
+    @Test(groups = {"OnboardingPageTests", "ProfessionScreenTests"}, priority = 75,
+            description = "Selecting 'Other' for Designation reveals a free-text field, distinct from the row's own label")
+    public void testSelectingOtherForDesignationRevealsFreeTextField() {
+        ProfessionPage page = gotoProfessionScreen().selectProfession(ProfessionPage.EMPLOYED);
+        ProfessionSearchPage search = page.openDesignationSearch().search("zzzznotarealdesignation");
+        Assert.assertTrue(search.isOtherOptionVisible(),
+                "'Other Not Listed Above' should be listed even with no real matches");
+        search.selectOther();
+
+        Assert.assertTrue(page.isOptionSelected(ProfessionSearchPage.OTHER_SELECTED_LABEL),
+                "Designation selector should now show '" + ProfessionSearchPage.OTHER_SELECTED_LABEL + "'");
+        Assert.assertTrue(page.isDesignationOtherFieldVisible(),
+                "Selecting 'Other' should reveal the '" + ProfessionPage.DESIGNATION_OTHER_HINT + "' field");
+        Assert.assertFalse(page.isContinueEnabled(),
+                "'Continue' should stay disabled while the 'Other' designation field is still empty");
+
+        page.openOrganizationSearch().search(SAMPLE_ORGANIZATION_QUERY).selectOption(SAMPLE_ORGANIZATION);
+        Assert.assertFalse(page.isContinueEnabled(),
+                "Precondition: 'Other' designation field still empty even with Organization resolved");
+        page.enterDesignationOtherText("Chief Something Officer");
+        Assert.assertTrue(page.isContinueEnabled(),
+                "'Continue' should enable once the 'Other' designation text and Organization are both resolved");
+    }
+
+    // =====================================================================
     // Full login flow (originates from LoggedInBaseTest)
     // =====================================================================
 
     @LoggedInBaseTests
-    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 51,
+    @Test(groups = {"OnboardingPageTests", "LoggedInBaseTests"}, priority = 90,
             description = "Full login (landing -> phone -> OTP -> interstitials) reaches Home")
     public void testFullLoginReachesHome() {
         HomePage home = LoginFlow.login(driver);

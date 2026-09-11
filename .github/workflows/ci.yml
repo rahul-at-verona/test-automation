@@ -47,7 +47,7 @@ jobs:
             -Dtnt.local.grid.password="${{ secrets.TNT_LOCAL_GRID_PASSWORD }}" \
             -Drp.api.key="${{ secrets.RP_API_KEY }}" \
             -Dgroups="OnboardingPageTests" \
-            -Drp.attributes="CiOnboardingTest"
+            -Drp.attributes="run:CiOnboardingTest"
 
       - name: Upload surefire reports
         if: always()
