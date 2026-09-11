@@ -71,13 +71,25 @@ public class OnboardingPageTests extends BaseTest {
 
     @BeforeMethod(alwaysRun = true)
     public void resetToLanding() {
-        if (firstMethod) {
-            firstMethod = false; // @BeforeClass already gave us a fresh landing
-        } else {
+        try {
+            if (firstMethod) {
+                firstMethod = false; // @BeforeClass already gave us a fresh landing
+            } else {
+                DriverFactory.clearAppStorage(driver);
+                ((AndroidDriver) driver).activateApp("club.verona");
+            }
+            landingPage = new LandingPage(driver).waitUntilLoaded();
+        } catch (org.openqa.selenium.WebDriverException e) {
+            // A dropped remote-grid session (observed live: UnreachableBrowserException,
+            // NoSuchSessionException, connection resets) otherwise cascades into every
+            // remaining test in the class failing/skipping the same way, since the driver
+            // session is shared across the whole class (@BeforeClass). Rebuild once and
+            // retry with a full clear+relaunch, mirroring ProfileTests.recoverToProfile().
+            resetSession();
             DriverFactory.clearAppStorage(driver);
             ((AndroidDriver) driver).activateApp("club.verona");
+            landingPage = new LandingPage(driver).waitUntilLoaded();
         }
-        landingPage = new LandingPage(driver).waitUntilLoaded();
     }
 
     // ---- navigation helpers ----

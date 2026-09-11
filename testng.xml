@@ -4,6 +4,7 @@
     <listeners>
         <listener class-name="com.epam.reportportal.testng.ReportPortalTestNGListener"/>
         <listener class-name="club.verona.automation.core.TestRunListener"/>
+        <listener class-name="club.verona.automation.core.RetryTransformer"/>
     </listeners>
     <test name="Profile">
         <groups>
